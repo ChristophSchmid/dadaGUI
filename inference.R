@@ -1,3 +1,16 @@
+#$ -S /usr/bin/env Rscript
+#$ -cwd 
+# set log file(s) name
+#$ -e log
+#$ -o log
+# name for job
+#$ -N inference.R
+#$ -pe hmp 10
+#
+# V1.00 written by Christoph Schmid, February 2017
+# V1.1, September 2018
+# ---------------------------
+
 #Script for denoising filtered and dereplicated FASTQ sequences
   #The script will read in previously filtered and dereplicated
   #FASTQs in the form of a .RData file. The .RData file contains three objects:
@@ -6,8 +19,6 @@
   #As no further user interaction is required, merging of paired reads,
   #construction a raw sequence table and removal of chimeric sequences
   #is done automatically.
-
-#written by Christoph Schmid, February 2017
 
 # CHECK ARGUMENTS PASSED AND READ INPUT FILE ---------------------------------
 
