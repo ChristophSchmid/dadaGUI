@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.4
+#!/usr/bin/env python3
 
 """
 This script codes for a GUI for the DADA2 pipeline.
