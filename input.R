@@ -1,11 +1,22 @@
+#$ -S /usr/bin/env Rscript
+#$ -cwd 
+# set log file name(s)
+#$ -e log
+#$ -o log
+# name for job
+#$ -N input.R
+#$ -pe hmp 10
+#
+# V1.00 written by Christoph Schmid, February 2017
+# V1.1, September 2018
+# ---------------------------
+
 #Script for processing of selected input FASTQ files
   #The script will read FASTQ files and produce quality
   #plots for forward and reverse reads separately. The
   #number of produced plots can be changed using the -p 
   #argument. Produced plots will be written to a subfolder 
   #within the input path.
-
-#written by Christoph Schmid, February 2017
 
 # CHECK ARGUMENTS PASSED AND READ INPUT FILE ---------------------------------
     library(optparse)
@@ -16,9 +27,9 @@
       make_option(c("-o", "--output", type = "character"), default = NULL,
                   help = "output directory"),
       make_option(c("-p", "--plot"), type = "integer", default = 5,
-                  help = "number of produced quality profile plots [default %default]"),
-      make_option(c("-V", "--version"), type = "character", default = NULL,
-                  help = "DADA2 version to be used. Unknown versions will be replaced by latest stable.")
+                  help = "number of produced quality profile plots [default %default]")
+#      make_option(c("-V", "--version"), type = "character", default = NULL,
+#                  help = "DADA2 version to be used. Unknown versions will be replaced by latest stable.")
       )
     
     opt_parser = OptionParser(option_list = option_list)
@@ -53,27 +64,29 @@
       }
     }
   #check dada2 version requested
-    if(file.exists("/project/genomics/Christoph/DADA2/package/versionsDADA2.txt")) {
-      versAvlb <- read.delim("/project/genomics/Christoph/DADA2/package/versionsDADA2.txt", 
-                             header = T, stringsAsFactors = F)
-    } else{
-      stop("Did not find DADA2 installation.")
-    }
-    
-    if(is.null(opt$version)) {
-      opt$version <- max(versAvlb[versAvlb$status == "stable",]$version)
-      message("No DADA2 version requested, using latest stable.: ", opt$version)
-    }else if(!opt$version %in% versAvlb$version) {
-      opt$version <- max(versAvlb[versAvlb$status == "stable",]$version)
-      message("DADA2 version requested not available, using latest stable: ", opt$version)
-    }
+#VERSION MANAGEMENT CURRENTLY NOT IMPLEMENTED
+#    if(file.exists("/project/genomics/Christoph/DADA2/package/versionsDADA2.txt")) {
+#      versAvlb <- read.delim("/project/genomics/Christoph/DADA2/package/versionsDADA2.txt", 
+#                             header = T, stringsAsFactors = F)
+#    } else{
+#      stop("Did not find DADA2 installation.")
+#    }
+#    
+#    if(is.null(opt$version)) {
+#      opt$version <- max(versAvlb[versAvlb$status == "stable",]$version)
+#      message("No DADA2 version requested, using latest stable.: ", opt$version)
+#    }else if(!opt$version %in% versAvlb$version) {
+#      opt$version <- max(versAvlb[versAvlb$status == "stable",]$version)
+#      message("DADA2 version requested not available, using latest stable: ", opt$version)
+#    }
 
 # READ IN FASTQ-FILES (after adapters are removed) -----------------------
 
   #load necessary libraries
     capture.output(
       {library(grDevices)
-        library("dada2", lib.loc = versAvlb[versAvlb$version == opt$version,]$path)
+#        library("dada2", lib.loc = versAvlb[versAvlb$version == opt$version,]$path)
+        library(dada2)
         library(ShortRead)},
       type = c("message"),
       file = "/dev/null")
