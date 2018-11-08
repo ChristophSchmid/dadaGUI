@@ -1,17 +1,26 @@
+#$ -S /usr/bin/env Rscript
+#$ -cwd 
+#$ -e log
+#$ -o log
+# name for job
+#$ -N filtering.R
+#$ -pe hmp 10
+#
+# V1.00 written by Christoph Schmid, February 2017
+# ---------------------------
+
 #Script for filtering of FASTQ files using dada2
   #According to user-set preferences this script
   #quality-filters selected FASTQ files and saves
   #the output in a new folder called "filtered".
   #Furthermore, dereplication is done to prepare
-  #denoising on the central server.
-
-#written by Christoph Schmid, February 2017
+  #denoising.
 
 # CHECK ARGUMENTS PASSED AND READ INPUT FILE ---------------------------------
   
     library(optparse)
 
-  #evaluate supplied arguments
+  #parse supplied arguments using optparse
     option_list = list(
       make_option(c("-f", "--forward"), type = "character", default = NULL,
                   help = "path file to forward read FASTQs"),
