@@ -1,9 +1,20 @@
-#Script for assigning taxonomy to sequence table
+#$ -S /usr/bin/env Rscript
+#$ -cwd 
+# set log file(s) name
+#$ -e log
+#$ -o log
+# name for job
+#$ -N taxonomy.R
+#$ -pe hmp 10
+#
+# V1.00 written by Christoph Schmid, February 2017
+# V1.1, September 2018
+# ---------------------------
+
+#Script for assigning taxonomy to a sequence table
   #The script assigns taxonomic units to a previously computed
   #sequence table. The database used for that can be specified
   #by the user.
-
-#written by Christoph Schmid, February 2017
 
 # CHECK ARGUMENTS PASSED AND READ INPUT FILE ---------------------------------
 
@@ -18,14 +29,12 @@
                   help = "output path"),
       make_option(c("-d", "--database"), type = "character", default = "silva",
                   help = "database used for assignments. Must be either of silva, rdp or gg [default: %default]"),
-      make_option(c("-b", "--biom"), action = "store_true", default = FALSE,
-                  help = "if set, a sequence table ready for conversion to biom format is created"),
       make_option(c("--tree"), action = "store_true", default = FALSE,
                   help = "If set, creation of phylogenetic tree is turned on"),
       make_option(c("--noPS"), action = "store_true", default = FALSE,
-                  help = "If set, creation of phyloseq object is turned off"),
-      make_option(c("-V", "--version"), type = "character", default = NULL,
-                  help = "DADA2 version to be used. Unknown versions will be replaced by latest stable.")
+                  help = "If set, creation of phyloseq object is turned off")
+#      make_option(c("-V", "--version"), type = "character", default = NULL,
+#                  help = "DADA2 version to be used. Unknown versions will be replaced by latest stable.")
     )
     
     opt_parser = OptionParser(option_list = option_list)
@@ -60,26 +69,28 @@
     }
     
   #check dada2 version requested
-    if(file.exists("/project/genomics/Christoph/DADA2/package/versionsDADA2.txt")) {
-      versAvlb <- read.delim("/project/genomics/Christoph/DADA2/package/versionsDADA2.txt", 
-                             header = T, stringsAsFactors = F)
-    } else{
-      stop("Did not find DADA2 installation.")
-    }
-    
-    if(is.null(opt$version)) {
-      opt$version <- max(versAvlb[versAvlb$status == "stable",]$version)
-      message("No DADA2 version requested, using latest stable.: ", opt$version)
-    }else if(!opt$version %in% versAvlb$version) {
-      opt$version <- max(versAvlb[versAvlb$status == "stable",]$version)
-      message("DADA2 version requested not available, using latest stable: ", opt$version)
-    }
+# VERSION MANAGEMENT CURRENTLY NOT IMPLEMENTED
+#    if(file.exists("/project/genomics/Christoph/DADA2/package/versionsDADA2.txt")) {
+#      versAvlb <- read.delim("/project/genomics/Christoph/DADA2/package/versionsDADA2.txt", 
+#                             header = T, stringsAsFactors = F)
+#    } else{
+#      stop("Did not find DADA2 installation.")
+#    }
+#    
+#    if(is.null(opt$version)) {
+#      opt$version <- max(versAvlb[versAvlb$status == "stable",]$version)
+#      message("No DADA2 version requested, using latest stable.: ", opt$version)
+#    }else if(!opt$version %in% versAvlb$version) {
+#      opt$version <- max(versAvlb[versAvlb$status == "stable",]$version)
+#      message("DADA2 version requested not available, using latest stable: ", opt$version)
+#    }
 
 # ASSIGN TAXONOMY -------------------------------------------------------------
   #load necessary libraries
     capture.output(
       {library(grDevices)
-        library("dada2", lib.loc = versAvlb[versAvlb$version == opt$version,]$path)
+#        library("dada2", lib.loc = versAvlb[versAvlb$version == opt$version,]$path)
+        library(dada2)
         library(ShortRead)
         library(graphics)},
       type = c("message"),
@@ -113,21 +124,13 @@
     seqTaxTable <- cbind(t(outSeq), taxaOut)
     write.table(seqTaxTable, file = file.path(opt$output, "seqTabClean_taxonomy.csv"), sep = "\t", quote = F)
     
-  #create text file for conversion to biom format if requested
-    if(opt$biom) {
-      catTax <- apply(taxaOut, 1, paste, collapse = "; ")
-      forBiomFile <- cbind("#OTU ID" = rownames(t(outSeq)), t(outSeq), "taxonomy" = catTax)
-      write.table(forBiomFile, file = file.path(opt$output, "seqTabClean_forBiom.txt"), 
-                  sep = "\t", quote = F, row.names = F)
-    }
-    
 # CONSTRUCT PHYLOGENETIC TREE ---------------------------------------------------
   
   #if --tree option is set, phylogenetic tree is not created
     if(opt$tree) 
     {
     #using package DECIPHER to align sequences
-      library(DECIPHER, quietly = T, lib.loc = "/project/genomics/Christoph/DADA2/package/")
+      library(DECIPHER, quietly = T)
       
       seqs <- getSequences(outSeq)
       names(seqs) <- seqs #necessary for tip labels of tree
