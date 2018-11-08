@@ -7,6 +7,7 @@
 #$ -pe hmp 10
 #
 # V1.00 written by Christoph Schmid, February 2017
+# V1.1, September 2018
 # ---------------------------
 
 #Script for filtering of FASTQ files using dada2
