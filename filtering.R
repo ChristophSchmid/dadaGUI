@@ -54,9 +54,9 @@
       make_option(c("-v", "--verbose"), action = "store_false", default = TRUE,
                   help = "If set, verbose output is turned off"),
       make_option(c("-d", "--derep"), action = "store_true", default = FALSE,
-                  help= "If set, dereplication of sequences is omitted"),
-      make_option(c("-V", "--version"), type = "character", default = NULL,
-                  help = "DADA2 version to be used. Unknown versions will be replaced by latest stable.")
+                  help= "If set, dereplication of sequences is omitted")
+#      make_option(c("-V", "--version"), type = "character", default = NULL,
+#                  help = "DADA2 version to be used. Unknown versions will be replaced by latest stable.")
     )
     
     opt_parser = OptionParser(option_list = option_list)
@@ -107,20 +107,21 @@
     }
     
   #check dada2 version requested
-    if(file.exists("/project/genomics/Christoph/DADA2/package/versionsDADA2.txt")) {
-      versAvlb <- read.delim("/project/genomics/Christoph/DADA2/package/versionsDADA2.txt", 
-                             header = T, stringsAsFactors = F)
-    } else{
-      stop("Did not find DADA2 installation.")
-    }
-    
-    if(is.null(opt$version)) {
-      opt$version <- max(versAvlb[versAvlb$status == "stable",]$version)
-      message("No DADA2 version requested, using latest stable.: ", opt$version)
-    }else if(!opt$version %in% versAvlb$version) {
-      opt$version <- max(versAvlb[versAvlb$status == "stable",]$version)
-      message("DADA2 version requested not available, using latest stable: ", opt$version)
-    }
+# VERSION MANAGEMENT CURRENTLY NOT IMPLEMENTED
+#    if(file.exists("/project/genomics/Christoph/DADA2/package/versionsDADA2.txt")) {
+#      versAvlb <- read.delim("/project/genomics/Christoph/DADA2/package/versionsDADA2.txt", 
+#                             header = T, stringsAsFactors = F)
+#    } else{
+#      stop("Did not find DADA2 installation.")
+#    }
+#    
+#    if(is.null(opt$version)) {
+#      opt$version <- max(versAvlb[versAvlb$status == "stable",]$version)
+#      message("No DADA2 version requested, using latest stable.: ", opt$version)
+#    }else if(!opt$version %in% versAvlb$version) {
+#      opt$version <- max(versAvlb[versAvlb$status == "stable",]$version)
+#      message("DADA2 version requested not available, using latest stable: ", opt$version)
+#    }
     
     setwd(opt$output)
 
@@ -130,7 +131,8 @@
   #load necessary libraries
     capture.output(
       {library(grDevices)
-        library("dada2", lib.loc = versAvlb[versAvlb$version == opt$version,]$path)
+#        library("dada2", lib.loc = versAvlb[versAvlb$version == opt$version,]$path)
+        library(dada2)
         library(ShortRead)
         library(graphics)},
       type = c("message"),
