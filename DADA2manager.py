@@ -13,6 +13,7 @@ from pubsub import pub
 import os
 from pathlib import Path
 from inspect import currentframe, getframeinfo
+from distutils.version import LooseVersion
 import subprocess as sp
 import csv
 import re
@@ -136,8 +137,8 @@ class selectFile(tk.Toplevel):
         for dirpath, dirnames, filenames in os.walk(self.selDir):
             files.extend(filenames)
             break
-        samplesF = sorted(list(filter(lambda x: 'pair1.truncated' in x, files)))
-        samplesR = sorted(list(filter(lambda x: 'pair2.truncated' in x, files)))
+        samplesF = sorted(list(filter(lambda x: 'pair1' in x, files)))
+        samplesR = sorted(list(filter(lambda x: 'pair2' in x, files)))
         sampleNames = [i.split('_')[0] for i in samplesF]
         sampleNames = sorted(list(set(sampleNames)))
 
@@ -225,7 +226,8 @@ class selectFile(tk.Toplevel):
             return
 
         # write input file for R script 'input.R'
-        if not os.path.isdir(self.outDir): os.mkdir(self.outDir)
+        if not os.path.isdir(self.outDir):
+            os.mkdir(self.outDir)
         inputFilePath = os.path.join(self.outDir, "inputPaths.txt")
         inputFile = open(inputFilePath, 'w')
 
@@ -250,7 +252,9 @@ class selectFile(tk.Toplevel):
                        "-i", inputArg,
                        "-o", outputArg,
                        "-p", plotArg,
-                       "-V", self.version[0]]
+                       "-V", self.version[0],
+                       "--path", self.scriptPath
+                       ]
 
         # run the R script
         try:
@@ -271,7 +275,7 @@ class filterReads(tk.Toplevel):
 
         self.version = version
         self.scriptPath = scriptPath
-        self.title('File selection and quality plots (V. ' + self.version[0] + ')')
+        self.title('Filtering of sequence reads (V. ' + self.version[0] + ')')
         self.protocol('WM_DELETE_WINDOW', self.onClose)
         self.forwardReadsPaths = ""
         self.reverseReadsPaths = ""
@@ -302,8 +306,8 @@ class filterReads(tk.Toplevel):
         self.entryValLrev = tk.StringVar()
         self.entryValRfwd = tk.StringVar()
         self.entryValRrev = tk.StringVar()
-        self.entryValLfwd.set("10")
-        self.entryValLrev.set("10")
+        self.entryValLfwd.set("0")
+        self.entryValLrev.set("0")
         self.entryValRfwd.set("300")
         self.entryValRrev.set("300")
         self.entryValminLenF = tk.StringVar()
@@ -388,15 +392,11 @@ class filterReads(tk.Toplevel):
         self.compressVar.set(1)
         self.verboseVar = tk.IntVar()
         self.verboseVar.set(1)
-        self.derepVar = tk.IntVar()
-        self.derepVar.set(0)
         self.compressCB = tk.Checkbutton(self.Frame, text="compress filtered FASTQs", var=self.compressVar)
         self.verboseCB = tk.Checkbutton(self.Frame, text="verbose output", var=self.verboseVar)
-        self.derepCB = tk.Checkbutton(self.Frame, text="perform dereplication", var=self.derepVar, state=tk.DISABLED)
 
         self.compressCB.grid(row=6, column=2)
         self.verboseCB.grid(row=6, column=3)
-        self.derepCB.grid(row=6, column=4)
 
         # -----------------
         # separating line 2
@@ -406,8 +406,6 @@ class filterReads(tk.Toplevel):
         self.line2.create_line(0, 5, 2000, 5, fill="black", width=2)
 
         # output directory and run button
-
-        # output directory and execute button
         self.btnOutDir = tk.Button(self.Frame, text="Select output folder ...",
                                    command=self.chooseOutDir)
         self.outDirLabel = tk.Label(self.Frame, text=self.outDir)
@@ -483,8 +481,8 @@ class filterReads(tk.Toplevel):
         pathToScript = self.scriptPath + "/filtering.R"
         fArg = self.forwardReadsPaths
         rArg = self.reverseReadsPaths
-        truncLfwdArg = self.truncEntryLfwd.get() if int(self.truncEntryLfwd.get()) >= 10 else "10"
-        truncLrevArg = self.truncEntryLrev.get() if int(self.truncEntryLrev.get()) >= 10 else "10"
+        truncLfwdArg = self.truncEntryLfwd.get()
+        truncLrevArg = self.truncEntryLrev.get()
         xArg = self.truncEntryRfwd.get()
         yArg = self.truncEntryRrev.get()
         oArg = self.outDir
@@ -503,7 +501,8 @@ class filterReads(tk.Toplevel):
                        "-y", yArg,
                        "-o", oArg,
                        "-q", qArg,
-                       "-V", self.version[0]]
+                       "-V", self.version[0],
+                       "--path", self.scriptPath]
 
         if not rArg == "": commandLine.append('-r'), commandLine.append(rArg)
         if not eArg == "": commandLine.append("-e"), commandLine.append(eArg)
@@ -513,7 +512,6 @@ class filterReads(tk.Toplevel):
         if not maxRArg == "": commandLine.append("--maxLenR"), commandLine.append(maxRArg)
         if not self.compressVar.get() == 1: commandLine.append("-c")
         if not self.verboseVar.get() == 1: commandLine.append("-v")
-        if not self.derepVar.get() == 1: commandLine.append("-d")
 
         # run the R script
         try:
@@ -539,7 +537,7 @@ class denoiseReads(tk.Toplevel):
 
         self.version = version
         self.scriptPath = scriptPath
-        self.title('File selection and quality plots (V. ' + self.version[0] + ')')
+        self.title('Denoising of sequence reads (V. ' + self.version[0] + ')')
         self.protocol('WM_DELETE_WINDOW', self.onClose)
         self.filtered = ""
         self.input = ""
@@ -555,12 +553,9 @@ class denoiseReads(tk.Toplevel):
         # file selection buttons
         self.filteredBtn = tk.Button(self.Frame, text="Select filtered fastq files ...",
                                      command=self.selFiltered, font="Helvetica 12")
-        self.inputBtn = tk.Button(self.Frame, text="Select input file ...",
-                                  command=self.selInput, font="Helvetica 12", state=tk.DISABLED)
         self.outpathBtn = tk.Button(self.Frame, text="Select output folder ...",
                                     command=self.selOutDir, font="Helvetica 12")
         self.labelFiltPath = tk.Label(self.Frame, text="Select directory of filtered fastqs", font="Helvetica 10")
-        self.labelInput = tk.Label(self.Frame, text="Select input file", font="Helvetica 10")
         self.labelOutpath = tk.Label(self.Frame, text="Select output directory", font="Helvetica 10")
 
         # label for plot number entry
@@ -579,13 +574,9 @@ class denoiseReads(tk.Toplevel):
         # entry for number of produced plots
         self.poolEntry = tk.Entry(self.Frame, textvariable=self.poolingVar, validate="key",
                                   validatecommand=(self.register(self.onValidate), '%d', '%S'),
-                                  state=tk.DISABLED if self.version[0] < "1.8.0" else tk.NORMAL)
+                                  state=tk.DISABLED if LooseVersion(self.version[0]) < LooseVersion("1.8.0") else tk.NORMAL)
 
         # Check buttons for binary options
-        self.mergeVar = tk.IntVar()
-        self.mergeVar.set(0)
-        self.mergeCB = tk.Checkbutton(self.Frame, text="override merging", var=self.mergeVar,
-                                      font="Helvetica 10", state=tk.DISABLED)
 
         self.concatVar = tk.IntVar()
         self.concatVar.set(0)
@@ -606,36 +597,29 @@ class denoiseReads(tk.Toplevel):
         # place elements on Frame
         # buttons
         self.filteredBtn.grid(row=1, column=1, columnspan=2, pady=10, padx=5)
-        self.inputBtn.grid(row=2, column=1, columnspan=2, pady=10, padx=5)
-        self.outpathBtn.grid(row=3, column=1, columnspan=2, pady=10, padx=5)
+        self.outpathBtn.grid(row=2, column=1, columnspan=2, pady=10, padx=5)
         self.labelFiltPath.grid(row=1, column=3, padx=5)
-        self.labelInput.grid(row=2, column=3, padx=5)
-        self.labelOutpath.grid(row=3, column=3, padx=5)
+        self.labelOutpath.grid(row=2, column=3, padx=5)
 
         # plot entry
-        self.plotLabel.grid(row=4, column=1, columnspan=2, pady=10, padx=5)
-        self.plotEntry.grid(row=4, column=3, pady=10, padx=5)
+        self.plotLabel.grid(row=3, column=1, columnspan=2, pady=10, padx=5)
+        self.plotEntry.grid(row=3, column=3, pady=10, padx=5)
 
         # pool entry
-        self.poolLabel.grid(row=5, column=1, columnspan=2, pady=10, padx=5)
-        self.poolEntry.grid(row=5, column=3, pady=10, padx=5)
+        self.poolLabel.grid(row=4, column=1, columnspan=2, pady=10, padx=5)
+        self.poolEntry.grid(row=4, column=3, pady=10, padx=5)
 
         # checkbuttons
-        self.mergeCB.grid(row=6, column=1, pady=10, padx=5)
-        self.concatCB.grid(row=6, column=2, pady=10, padx=5)
-        self.seqtabCB.grid(row=6, column=3, pady=10, padx=5)
-        self.chimeraCB.grid(row=6, column=4, pady=10, padx=5)
+        self.concatCB.grid(row=5, column=1, pady=10, padx=5)
+        self.seqtabCB.grid(row=5, column=2, pady=10, padx=5)
+        self.chimeraCB.grid(row=5, column=3, pady=10, padx=5)
 
         # run button
-        self.runBtn.grid(row=7, column=3, pady=10, padx=5)
+        self.runBtn.grid(row=6, column=3, pady=10, padx=5)
 
     def selFiltered(self):
         self.filtered = fd.askdirectory()
         self.labelFiltPath.configure(text=self.filtered)
-
-    def selInput(self):
-        self.input = fd.askopenfilename()
-        self.labelInput.configure(text=self.input)
 
     def selOutDir(self):
         self.outDir = fd.askdirectory()
@@ -647,11 +631,6 @@ class denoiseReads(tk.Toplevel):
             tk.messagebox.showinfo(title="Data missing",
                                    message="Path to filtered fastq files missing!")
             return
-
-        # if (self.input == ""):
-        # tk.messagebox.showinfo(title="Data missing",
-        #                        message="Input file missing!")
-        # return
 
         if self.outDir == "":
             tk.messagebox.showinfo(title="Data missing",
@@ -665,25 +644,24 @@ class denoiseReads(tk.Toplevel):
 
         # producing command line to run R Script
 
-        process = "qsub"
+        process = "Rscript"
         pathToScript = self.scriptPath + "/inference.R"
         fArg = self.filtered
-        # iArg=self.input
         oArg = self.outDir
         pArg = self.plotVar.get()
 
         commandLine = [process, pathToScript,
                        "-f", fArg,
-                       "-o", oArg,
                        "-p", pArg,
+                       "-o", oArg,
                        "-V", self.version[0],
-                       "-r", self.poolingVar.get()
+                       "--pool", self.poolingVar.get(),
+                       "--path", self.scriptPath
                        ]
 
-        # if (self.mergeVar.get() == 1): commandLine.append("-m")
-        if self.seqtabVar.get() == 1: commandLine.append("-s")
-        if self.chimeraVar.get() == 1: commandLine.append("-c")
-        if self.concatVar.get() == 1: commandLine.append("-t")
+        if self.seqtabVar.get() == 1: commandLine.append("--seqtab")
+        if self.chimeraVar.get() == 1: commandLine.append("--chimera")
+        if self.concatVar.get() == 1: commandLine.append("--concat")
 
         # run the R script
         try:
@@ -693,7 +671,7 @@ class denoiseReads(tk.Toplevel):
                                     message="Execution of script inference.R failed")
         else:
             tk.messagebox.showinfo(title="inference.R",
-                                   message="Upload to server successful")
+                                   message="Denoising of sequence reads successful.")
 
     def onValidate(self, d, S):
         if int(d) != 1: return True
@@ -719,12 +697,36 @@ class taxonomyReads(tk.Toplevel):
 
         self.version = version
         self.scriptPath = scriptPath
-        self.title('File selection and quality plots (V. ' + self.version[0] + ')')
+
+        # set default values for supported databases
+        self.silva = False
+        self.rdp = False
+        self.gg = False
+        self.unite = False
+        # check installation folder for databases
+        self.checkDatabases()
+
+        self.DATABASES_implemented = [
+            ("SILVA", "silva", self.silva),
+            ("RDP", "rdp", self.rdp),
+            ("Green Genes", "gg", self.gg),
+            ("UNITE (ITS)", "unite", self.unite)
+        ]
+
+        self.title('Taxonomic assignments (V. ' + self.version[0] + ')')
         self.protocol('WM_DELETE_WINDOW', self.onClose)
         self.input = ""
         self.outDir = ""
 
         self.initUI()
+
+        # if no installations were found: close window with error message
+        if not any([self.silva, self.rdp, self.gg, self.unite]):
+            tk.messagebox.showerror(title="No databases installed",
+                                    message="No databases were found.\n" +
+                                            "Check the documentation for how " +
+                                            "to install databases.")
+            self.onClose()
 
     def initUI(self):
         # HEAD FRAME with button and plot entry
@@ -742,30 +744,20 @@ class taxonomyReads(tk.Toplevel):
         # data base selection
         self.labelDB = tk.Label(self.Frame, text="Database to use:", font="Helvetica 12 underline")
 
-        DATABASES = [
-            ("SILVA", "silva"),
-            ("RDP", "rdp"),
-            ("Green Genes", "gg"),
-            ("UNITE (ITS)", "unite")
-        ]
+        DATABASES_used = []
+        for (text, db, installed) in self.DATABASES_implemented:
+            if installed:
+                DATABASES_used.append((text, db))
 
         self.dbVar = tk.StringVar()
         self.dbVar.set("silva")
 
-        for idx, (text, db) in enumerate(DATABASES):
+        for idx, (text, db) in enumerate(DATABASES_used):
             rb = tk.Radiobutton(self.Frame, text=text, variable=self.dbVar,
                                 value=db, indicatoron=1)
             rb.grid(row=idx + 4, column=1, pady=10, padx=5, sticky=tk.W + tk.E)
 
         # Check buttons for binary options
-        self.biomVar = tk.IntVar()
-        self.biomVar.set(0)
-        self.biomCB = tk.Checkbutton(self.Frame, text="create BIOM file", var=self.biomVar,
-                                     font="Helvetica 10")
-        self.treeVar = tk.IntVar()
-        self.treeVar.set(0)
-        self.treeCB = tk.Checkbutton(self.Frame, text="create phylogeny tree", var=self.treeVar,
-                                     font="Helvetica 10")
         self.psVar = tk.IntVar()
         self.psVar.set(1)
         self.psCB = tk.Checkbutton(self.Frame, text="save data as phyloseq", var=self.psVar,
@@ -785,12 +777,31 @@ class taxonomyReads(tk.Toplevel):
         self.labelDB.grid(row=3, column=1, pady=10, padx=5)
 
         # checkbuttons
-        self.biomCB.grid(row=4, column=2, pady=10, padx=5)
-        self.treeCB.grid(row=5, column=2, pady=10, padx=5)
-        self.psCB.grid(row=6, column=2, pady=10, padx=5)
+        self.psCB.grid(row=5, column=2, pady=10, padx=5)
 
         # run button
         self.runBtn.grid(row=7, column=2, pady=10, padx=5)
+
+    def checkDatabases(self):
+        """Checks if database folders exist and if they contain ANY files"""
+
+        genus = "train_set"
+        species = "species"
+        unite = "general_release"
+
+        self.silva = os.path.exists(self.scriptPath + '/taxonomy/silva') and any(
+            [genus in file for file in os.listdir(self.scriptPath + '/taxonomy/silva')]) and any(
+            [species in file for file in os.listdir(self.scriptPath + '/taxonomy/silva')])
+
+        self.rdp = os.path.exists(self.scriptPath + '/taxonomy/rdp') and any(
+            [genus in file for file in os.listdir(self.scriptPath + '/taxonomy/rdp')]) and any(
+            [species in file for file in os.listdir(self.scriptPath + '/taxonomy/rdp')])
+
+        self.gg = os.path.exists(self.scriptPath + '/taxonomy/gg') and any(
+            [genus in file for file in os.listdir(self.scriptPath + '/taxonomy/gg')])
+
+        self.unite = os.path.exists(self.scriptPath + '/taxonomy/unite') and any(
+            [unite in file for file in os.listdir(self.scriptPath + '/taxonomy/unite')])
 
     def selInput(self):
         self.input = fd.askopenfilename()
@@ -814,7 +825,7 @@ class taxonomyReads(tk.Toplevel):
 
         # producing command line to run R Script
 
-        process = "qsub"
+        process = "Rscript"
         pathToScript = self.scriptPath + "/taxonomy.R"
         iArg = self.input
         oArg = self.outDir
@@ -824,11 +835,11 @@ class taxonomyReads(tk.Toplevel):
                        "-i", iArg,
                        "-o", oArg,
                        "-d", dArg,
-                       "-V", self.version[0]]
+                       "-V", self.version[0],
+                       "--path", self.scriptPath
+                       ]
 
-        if self.biomVar.get() == 1: commandLine.append("-b")
-        if self.treeVar.get() == 1: commandLine.append("-t")
-        if not self.psVar.get() == 1: commandLine.append("-p")
+        if not self.psVar.get() == 1: commandLine.append("--noPS")
 
         # run the R script
         try:
@@ -838,7 +849,7 @@ class taxonomyReads(tk.Toplevel):
                                     message="Execution of script taxonomy.R failed")
         else:
             tk.messagebox.showinfo(title="taxonomy.R",
-                                   message="Upload to server successful")
+                                   message="Assignment of taxonomy to ASVs successful.")
 
     def onClose(self):
         """destructor"""
@@ -846,207 +857,61 @@ class taxonomyReads(tk.Toplevel):
         self.destroy()
 
 
-class phyloTree(tk.Toplevel):
-    def __init__(self, scriptPath):
-        """Constructor Select Files Frame"""
-        tk.Toplevel.__init__(self)
-
-        self.scriptPath = scriptPath
-        self.title('Calculation of phylogenetic tree')
-        self.protocol('WM_DELETE_WINDOW', self.onClose)
-        self.input = ""
-        self.outDir = ""
-
-        self.initUI()
-
-    def initUI(self):
-        # HEAD FRAME with button and plot entry
-        self.Frame = tk.Frame(self)
-        self.Frame.grid()
-
-        # file selection buttons
-        self.inputBtn = tk.Button(self.Frame, text="Select input FASTA file ...",
-                                  command=self.selInput, font="Helvetica 12")
-        self.outpathBtn = tk.Button(self.Frame, text="Select output folder ...",
-                                    command=self.selOutDir, font="Helvetica 12")
-        self.labelInput = tk.Label(self.Frame, text="Select input FASTA before continuing", font="Helvetica 10")
-        self.labelOutpath = tk.Label(self.Frame, text="Select output directory before continuing", font="Helvetica 10")
-
-        # run button
-        self.runBtn = tk.Button(self.Frame, text="RUN", command=self.runPhylotreeScript, font="Helvetica 12")
-
-        # place elements on Frame
-        # buttons
-        self.inputBtn.grid(row=1, column=1, pady=10, padx=5)
-        self.outpathBtn.grid(row=2, column=1, pady=10, padx=5)
-        self.labelInput.grid(row=1, column=2, padx=5)
-        self.labelOutpath.grid(row=2, column=2, padx=5)
-
-        # run button
-        self.runBtn.grid(row=3, column=2, pady=10, padx=5)
-
-    def selInput(self):
-        self.input = fd.askopenfilename()
-        self.labelInput.configure(text=self.input)
-
-    def selOutDir(self):
-        self.outDir = fd.askdirectory()
-        self.labelOutpath.configure(text=self.outDir)
-
-    def runPhylotreeScript(self):
-        # check if all necessary inputs were made
-        if self.input == "":
-            tk.messagebox.showinfo(title="Data missing",
-                                   message="Input FASTA missing!")
-            return
-
-        if self.outDir == "":
-            tk.messagebox.showinfo(title="Data missing",
-                                   message="Output directory missing!")
-            return
-
-        # producing command line to run R Script
-
-        process = "qsub"
-        pathToScript = self.scriptPath + "/phylotree.R"
-        iArg = self.input
-        oArg = self.outDir
-
-        commandLine = [process, pathToScript,
-                       "-i", iArg,
-                       "-o", oArg]
-
-        # run the R script
-        try:
-            sp.check_call(commandLine)
-        except sp.CalledProcessError:
-            tk.messagebox.showerror(title="Error in calling script",
-                                    message="Execution of script phylotree.R failed")
-        else:
-            tk.messagebox.showinfo(title="phylotree.R",
-                                   message="Upload to server successful")
-
-    def onClose(self):
-        """destructor"""
-        pub.sendMessage('subWindowClosed')
-        self.destroy()
-
-
-# class sequenceTracker(tk.Toplevel):
-#
-#     def __init__(self, version):
+# class phyloTree(tk.Toplevel):
+#     def __init__(self, scriptPath):
 #         """Constructor Select Files Frame"""
 #         tk.Toplevel.__init__(self)
-#         # self.geometry('600x400')
-#         self.version = version
-#         self.title('File selection and quality plots (V. ' + self.version[0] + ')')
+#
+#         self.scriptPath = scriptPath
+#         self.title('Calculation of phylogenetic tree')
 #         self.protocol('WM_DELETE_WINDOW', self.onClose)
-#         self.filteringDir = ""
-#         self.dadaDir = ""
-#         self.mergeDir = ""
-#         self.seqtabDir = ""
-#         self.chimeraDir = ""
+#         self.input = ""
 #         self.outDir = ""
 #
 #         self.initUI()
 #
 #     def initUI(self):
-#         """Initialise Elements for Subwindow"""
-#
 #         # HEAD FRAME with button and plot entry
 #         self.Frame = tk.Frame(self)
 #         self.Frame.grid()
 #
 #         # file selection buttons
-#         self.filteringBtn = tk.Button(self.Frame, text="Select filtering.RData ...",
-#                                       command=self.selFiltering, font="Helvetica 12")
-#         self.dadaBtn = tk.Button(self.Frame, text="Select dada.RData ...",
-#                                  command=self.selDada, font="Helvetica 12")
-#         self.mergeBtn = tk.Button(self.Frame, text="Select mergedReads.RData ...",
-#                                   command=self.selMerge, font="Helvetica 12")
-#         self.seqtabBtn = tk.Button(self.Frame, text="Select seqTabRaw.RData ...",
-#                                    command=self.selSeqtab, font="Helvetica 12")
-#         self.chimeraBtn = tk.Button(self.Frame, text="Select seqTabClean.RData ...",
-#                                     command=self.selChimera, font="Helvetica 12")
-#         self.outdirBtn = tk.Button(self.Frame, text="Select output directory ...",
-#                                    command=self.selOutdir, font="Helvetica 12")
-#         self.runBtn = tk.Button(self.Frame, text="RUN",
-#                                 command=self.runTrackerScript, font="Helvetica 12")
+#         self.inputBtn = tk.Button(self.Frame, text="Select input FASTA file ...",
+#                                   command=self.selInput, font="Helvetica 12")
+#         self.outpathBtn = tk.Button(self.Frame, text="Select output folder ...",
+#                                     command=self.selOutDir, font="Helvetica 12")
+#         self.labelInput = tk.Label(self.Frame, text="Select input FASTA before continuing", font="Helvetica 10")
+#         self.labelOutpath = tk.Label(self.Frame, text="Select output directory before continuing", font="Helvetica 10")
 #
-#         self.labelFilter = tk.Label(self.Frame, text="Select filtering.RData before continuing", font="Helvetica 10")
-#         self.labelDada = tk.Label(self.Frame, text="Select dada.RData before continuing", font="Helvetica 10")
-#         self.labelMerge = tk.Label(self.Frame, text="Select mergedReads.RData before continuing", font="Helvetica 10")
-#         self.labelSeqtab = tk.Label(self.Frame, text="Select seqTabRaw.RData before continuing", font="Helvetica 10")
-#         self.labelChimera = tk.Label(self.Frame, text="Select seqTabClean.RData before continuing", font="Helvetica 10")
-#         self.labelOutdir = tk.Label(self.Frame, text="Select output directory before continuing", font="Helvetica 10")
+#         # run button
+#         self.runBtn = tk.Button(self.Frame, text="RUN", command=self.runPhylotreeScript, font="Helvetica 12")
 #
-#         self.filteringBtn.grid(row=1, column=1, pady=10, padx=5)
-#         self.dadaBtn.grid(row=2, column=1, pady=10, padx=5)
-#         self.mergeBtn.grid(row=3, column=1, pady=10, padx=5)
-#         self.seqtabBtn.grid(row=4, column=1, pady=10, padx=5)
-#         self.chimeraBtn.grid(row=5, column=1, pady=10, padx=5)
-#         self.outdirBtn.grid(row=6, column=1, pady=10, padx=5)
-#         self.runBtn.grid(row=7, column=2, pady=10, padx=5)
+#         # place elements on Frame
+#         # buttons
+#         self.inputBtn.grid(row=1, column=1, pady=10, padx=5)
+#         self.outpathBtn.grid(row=2, column=1, pady=10, padx=5)
+#         self.labelInput.grid(row=1, column=2, padx=5)
+#         self.labelOutpath.grid(row=2, column=2, padx=5)
 #
-#         self.labelFilter.grid(row=1, column=2, pady=10, padx=5)
-#         self.labelDada.grid(row=2, column=2, pady=10, padx=5)
-#         self.labelMerge.grid(row=3, column=2, pady=10, padx=5)
-#         self.labelSeqtab.grid(row=4, column=2, pady=10, padx=5)
-#         self.labelChimera.grid(row=5, column=2, pady=10, padx=5)
-#         self.labelOutdir.grid(row=6, column=2, pady=10, padx=5)
+#         # run button
+#         self.runBtn.grid(row=3, column=2, pady=10, padx=5)
 #
-#     def selFiltering(self):
-#         self.filteringDir = fd.askopenfilename()
-#         self.labelFilter.configure(text=self.filteringDir)
+#     def selInput(self):
+#         self.input = fd.askopenfilename()
+#         self.labelInput.configure(text=self.input)
 #
-#     def selDada(self):
-#         self.dadaDir = fd.askopenfilename()
-#         self.labelDada.configure(text=self.dadaDir)
-#
-#     def selMerge(self):
-#         self.mergeDir = fd.askopenfilename()
-#         self.labelMerge.configure(text=self.mergeDir)
-#
-#     def selSeqtab(self):
-#         self.seqtabDir = fd.askopenfilename()
-#         self.labelSeqtab.configure(text=self.seqtabDir)
-#
-#     def selChimera(self):
-#         self.chimeraDir = fd.askopenfilename()
-#         self.labelChimera.configure(text=self.chimeraDir)
-#
-#     def selOutdir(self):
+#     def selOutDir(self):
 #         self.outDir = fd.askdirectory()
-#         self.labelOutdir.configure(text=self.outDir)
+#         self.labelOutpath.configure(text=self.outDir)
 #
-#     def runTrackerScript(self):
+#     def runPhylotreeScript(self):
 #         # check if all necessary inputs were made
-#         if (self.filteringDir == ""):
+#         if self.input == "":
 #             tk.messagebox.showinfo(title="Data missing",
-#                                    message="Filtering.RData missing!")
+#                                    message="Input FASTA missing!")
 #             return
 #
-#         if (self.dadaDir == ""):
-#             tk.messagebox.showinfo(title="Data missing",
-#                                    message="dada.RData missing!")
-#             return
-#
-#         if (self.mergeDir == ""):
-#             tk.messagebox.showinfo(title="Data missing",
-#                                    message="mergedReads.RData missing!")
-#             return
-#
-#         if (self.seqtabDir == ""):
-#             tk.messagebox.showinfo(title="Data missing",
-#                                    message="seqTabRaw.RData missing!")
-#             return
-#
-#         if (self.chimeraDir == ""):
-#             tk.messagebox.showinfo(title="Data missing",
-#                                    message="seqTabClean.RData missing!")
-#             return
-#
-#         if (self.outDir == ""):
+#         if self.outDir == "":
 #             tk.messagebox.showinfo(title="Data missing",
 #                                    message="Output directory missing!")
 #             return
@@ -1054,31 +919,23 @@ class phyloTree(tk.Toplevel):
 #         # producing command line to run R Script
 #
 #         process = "Rscript"
-#         pathToScript = "/project/genomics/Christoph/DADA2/tracker.R"
-#         fArg = self.filteringDir
-#         dArg = self.dadaDir
-#         mArg = self.mergeDir
-#         sArg = self.seqtabDir
-#         cArg = self.chimeraDir
+#         pathToScript = self.scriptPath + "/phylotree.R"
+#         iArg = self.input
 #         oArg = self.outDir
 #
 #         commandLine = [process, pathToScript,
-#                        "-f", fArg,
-#                        "-d", dArg,
-#                        "-m", mArg,
-#                        "-s", sArg,
-#                        "-c", cArg,
+#                        "-i", iArg,
 #                        "-o", oArg]
 #
 #         # run the R script
 #         try:
 #             sp.check_call(commandLine)
 #         except sp.CalledProcessError:
-#             tk.messagebox.showerror(title="Error in calling R script",
-#                                     message="Execution of script tracker.R failed")
+#             tk.messagebox.showerror(title="Error in calling script",
+#                                     message="Execution of script phylotree.R failed")
 #         else:
-#             tk.messagebox.showinfo(title="tracker.R",
-#                                    message="Script tracker.R finished successfully")
+#             tk.messagebox.showinfo(title="phylotree.R",
+#                                    message="Upload to server successful")
 #
 #     def onClose(self):
 #         """destructor"""
@@ -1093,8 +950,8 @@ class mainFrame(tk.Frame):
         super().__init__()
 
         self.root = parent
-        self.versionFile = './versionsDADA2.txt'
 
+        self.versionFile = self.getScriptDirectory() + '/versionsDADA2.txt'
         self.checkVersionFile()
 
         self.initUI()
@@ -1131,10 +988,9 @@ class mainFrame(tk.Frame):
                                command=self.denoiseFrame)
         taxnonmyBtn = tk.Button(self.frame, text='Taxonomic annotation',
                                 command=self.taxonomyFrame)
-        treeBtn = tk.Button(self.frame, text='Phylogenetic tree calculation',
-                            command=self.phyloFrame)
-        # trackerBtn = tk.Button(self.frame, text='Tracking of sequence numbers',
-        #                        command=self.sequenceTracker)
+        treeBtn = tk.Button(self.frame, text='Phylogenetic tree calculation\n(coming soon)',
+                            command=self.phyloFrame, state=tk.DISABLED)
+
         versionLabel = tk.Label(self.frame, text="DADA2 version used:", font="Helvetica 10", )
         versionDD = tk.OptionMenu(self.frame, self.versionSelection, *self.choices)
 
@@ -1157,13 +1013,13 @@ class mainFrame(tk.Frame):
         to a new versions file. If DADA2 was not found, an error message is shown and the program closes.
         """
 
-        if not os.path.isfile('./versionsDADA2.txt'):
+        if not os.path.isfile(self.versionFile):
             checkData = str(
-                sp.check_output(
-                'Rscript ' + self.getScriptDirectory() + '/checkDADAVersion.R; exit 0',
-                stderr=sp.STDOUT,
-                shell=True
-            ))
+                    sp.check_output(
+                    'Rscript ' + self.getScriptDirectory() + '/checkDADAVersion.R; exit 0',
+                    stderr=sp.STDOUT,
+                    shell=True
+                ))
 
             if "not found" in checkData:
                 tk.messagebox.showerror(title="Something went wrong",
@@ -1264,18 +1120,6 @@ class mainFrame(tk.Frame):
         """opens taxonomyReads window"""
         self.hide()
         subFrame = phyloTree(self.getScriptDirectory())
-
-    # def sequenceTracker(self):
-    #     """opens taxonomyReads window"""
-    #     self.hide()
-    #     if self.versionSelection.get() in self.versionsStable:
-    #         subFrame = sequenceTracker(version=self.versionsStable[self.versionSelection.get()])
-    #     elif self.versionSelection.get() in self.versionsDev:
-    #         subFrame = sequenceTracker(version=self.versionsDev[self.versionSelection.get()])
-    #     else:
-    #         pub.sendMessage('subWindowClosed')
-    #         tk.messagebox.showerror(title="DADA2 version unknown",
-    #                                 message="Selected DADA2 version not available.")
 
 
 if __name__ == '__main__':
